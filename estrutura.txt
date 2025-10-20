@@ -1,0 +1,18 @@
+Site_intermedio_4
+├── admin
+│   ├── api
+│   │   ├── accounts.php
+│   │   ├── sections.php
+│   │   ├── settings.php
+│   │   └── upload.php
+│   ├── dashboard.php
+│   ├── login.php
+│   ├── logout.php
+│   └── settings.php
+├── includes
+│   ├── auth.php
+│   ├── config.php
+│   ├── database.php
+│   └── functions.php
+├── index.php
+└── pass.php
