@@ -17,13 +17,23 @@ $faq_section = getSection('faq');
 $testimonials_section = getSection('testimonials');
 $contact_section = getSection('contact');
 
-$services = getServices($services_section['id']);
-$accounts = getAccounts('available', 3); // Apenas 3 contas para a seção
+$services = getServices();
+// Buscar todas as contas e separar por status
+$all_accounts = getAccounts();
+$premium_accounts = array_values(array_filter($all_accounts, fn($a) => ($a['status'] ?? '') === 'premium'));
+$available_accounts = array_values(array_filter($all_accounts, fn($a) => ($a['status'] ?? '') === 'available'));
+$sold_accounts = array_values(array_filter($all_accounts, fn($a) => ($a['status'] ?? '') === 'sold'));
 $faqs = getFAQs();
 $testimonials = getTestimonials(3); // Apenas 3 depoimentos
 $partners = getPartners();
 $social_media = getSocialMedia();
-$contact_info = getContactInfo();
+$contact_info = [
+    'email' => getSetting('contact_email'),
+    'phone' => getSetting('contact_phone'),
+    'discord' => getSetting('contact_discord')
+];
+// Normalizar telefone para link do WhatsApp
+$contact_phone_link = preg_replace('/\D+/', '', (string)($contact_info['phone'] ?? ''));
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -44,6 +54,19 @@ $contact_info = getContactInfo();
             --secondary: <?php echo $secondary_color; ?>;
             --accent: <?php echo $accent_color; ?>;
         }
+        .theme-toggle { position: fixed; right: 1rem; bottom: 1rem; z-index: 60; }
+        .theme-toggle button { box-shadow: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -2px rgba(0,0,0,.05); }
+        /* Light theme overrides */
+        .light .bg-gray-900 { background-color: #f9fafb !important; }
+        .light .bg-gray-800 { background-color: #f3f4f6 !important; }
+        .light .bg-gray-700 { background-color: #e5e7eb !important; }
+        .light .text-gray-100, .light .text-white { color: #111827 !important; }
+        .light .text-gray-300 { color: #4b5563 !important; }
+        .light .text-gray-400 { color: #6b7280 !important; }
+        .light nav, .light footer { background-color: #ffffff !important; }
+        .light .bg-black { background-color: rgba(255,255,255,0.9) !important; }
+        .light .bg-opacity-80 { --tw-bg-opacity: 0.4 !important; }
+        .light .card-hover:hover { box-shadow: 0 20px 25px -5px rgba(0,0,0,.08), 0 10px 10px -5px rgba(0,0,0,.04); }
         
         /* Custom shapes for sections */
         .custom-shape {
@@ -93,7 +116,13 @@ body {
         }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100">
+<body class="bg-gray-900 text-gray-100" id="appRoot">
+    <!-- Theme Toggle -->
+    <div class="theme-toggle">
+        <button id="themeToggle" class="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold p-3 rounded-full transition">
+            <i data-feather="moon"></i>
+        </button>
+    </div>
     <!-- Vanta.js Background -->
     <div id="vanta-bg"></div>
     <!-- Navigation -->
@@ -110,6 +139,7 @@ body {
                     <a href="#home" class="text-yellow-400 hover:text-yellow-300 px-3 py-2 text-sm font-medium">Home</a>
                     <a href="#services" class="text-gray-300 hover:text-yellow-300 px-3 py-2 text-sm font-medium">Serviços</a>
                     <a href="#gallery" class="text-gray-300 hover:text-yellow-300 px-3 py-2 text-sm font-medium">Galeria</a>
+                    <a href="#partners" class="text-gray-300 hover:text-yellow-300 px-3 py-2 text-sm font-medium">Parceiros</a>
                     <a href="#faq" class="text-gray-300 hover:text-yellow-300 px-3 py-2 text-sm font-medium">FAQ</a>
                     <a href="#contact" class="text-gray-300 hover:text-yellow-300 px-3 py-2 text-sm font-medium">Contato</a>
                     <a href="admin/login.php" class="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-2 px-4 rounded-lg transition duration-300 flex items-center">
@@ -129,6 +159,7 @@ body {
                 <a href="#home" class="text-yellow-400 block px-3 py-2 rounded-md text-base font-medium">Home</a>
                 <a href="#services" class="text-gray-300 hover:text-yellow-300 block px-3 py-2 rounded-md text-base font-medium">Serviços</a>
                 <a href="#gallery" class="text-gray-300 hover:text-yellow-300 block px-3 py-2 rounded-md text-base font-medium">Galeria</a>
+                <a href="#partners" class="text-gray-300 hover:text-yellow-300 block px-3 py-2 rounded-md text-base font-medium">Parceiros</a>
                 <a href="#faq" class="text-gray-300 hover:text-yellow-300 block px-3 py-2 rounded-md text-base font-medium">FAQ</a>
                 <a href="#contact" class="text-gray-300 hover:text-yellow-300 block px-3 py-2 rounded-md text-base font-medium">Contato</a>
                 <button class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-2 px-4 rounded-lg transition duration-300 flex items-center justify-center mt-2">
@@ -162,6 +193,23 @@ body {
             <a href="#services" class="animate-bounce">
                 <i data-feather="chevron-down" class="text-yellow-400 w-10 h-10"></i>
             </a>
+        </div>
+    </section>
+    <!-- Partners Section -->
+    <section id="partners" class="py-16 relative overflow-hidden">
+        <div class="absolute inset-0 bg-black bg-opacity-60 z-0"></div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+            <div class="text-center mb-10 scroll-animate">
+                <h2 class="text-3xl md:text-4xl font-bold text-yellow-400 mb-4">Parceiros</h2>
+                <div class="w-20 h-1 bg-yellow-500 mx-auto"></div>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6 items-center">
+                <?php foreach ($partners as $partner): ?>
+                <a href="<?php echo htmlspecialchars($partner['website_url'] ?? '#'); ?>" target="_blank" class="bg-gray-800/60 rounded-lg p-4 flex items-center justify-center hover:bg-gray-800 transition">
+                    <img src="<?php echo $partner['logo'] ?: 'https://via.placeholder.com/120x60/1f2937/6b7280?text=LOGO'; ?>" alt="<?php echo htmlspecialchars($partner['name'] ?? 'Parceiro'); ?>" class="h-12 object-contain">
+                </a>
+                <?php endforeach; ?>
+            </div>
         </div>
     </section>
     <!-- Services Section -->
@@ -207,22 +255,83 @@ body {
                 </p>
             </div>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <?php foreach ($accounts as $account): ?>
-                <div class="relative group overflow-hidden rounded-xl shadow-lg scroll-animate">
-                    <img src="<?php echo $account['image']; ?>" alt="<?php echo $account['title']; ?>" class="w-full h-64 object-cover transition duration-500 group-hover:scale-110">
+            <!-- Destaques Premium -->
+            <?php if (!empty($premium_accounts)): ?>
+            <h3 class="text-2xl font-bold text-yellow-400 mb-6 scroll-animate">Destaques Premium</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+                <?php foreach (array_slice($premium_accounts, 0, 6) as $account): ?>
+                <a href="/conta.php?id=<?php echo (int)$account['id']; ?>" class="relative group overflow-hidden rounded-xl shadow-lg scroll-animate ring-2 ring-yellow-500/40 account-card" data-price-brl="<?php echo htmlspecialchars((string)(float)$account['price']); ?>">
+                    <img src="<?php echo $account['image'] ?: 'https://via.placeholder.com/800x600/1f2937/6b7280?text=Sem+Imagem'; ?>" alt="<?php echo htmlspecialchars($account['title']); ?>" class="w-full h-64 object-cover transition duration-500 group-hover:scale-110">
                     <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
+                    <div class="absolute top-3 left-3"><span class="px-2 py-1 text-xs rounded-full bg-yellow-900 text-yellow-300">Premium</span></div>
                     <div class="absolute bottom-0 left-0 right-0 p-6">
-                        <h3 class="text-xl font-bold text-white"><?php echo $account['title']; ?></h3>
-                        <p class="text-yellow-400 font-semibold">PS: <?php echo $account['power_score']; ?></p>
+                        <h3 class="text-xl font-bold text-white"><?php echo htmlspecialchars($account['title']); ?></h3>
+                        <p class="text-yellow-400 font-semibold">PS: <?php echo htmlspecialchars($account['power_score']); ?></p>
                         <div class="flex justify-between items-center mt-2">
-                            <span class="text-gray-300">Nível <?php echo $account['level']; ?></span>
-                            <span class="text-yellow-400 font-bold">R$ <?php echo number_format($account['price'], 2, ',', '.'); ?></span>
+                            <span class="text-gray-300">Nível <?php echo htmlspecialchars($account['level']); ?></span>
+                            <span class="text-yellow-400 font-bold">R$ <?php echo number_format((float)$account['price'], 2, ',', '.'); ?></span>
+                        </div>
+                        <div class="mt-1 text-sm text-gray-300 flex gap-4">
+                            <span class="price-usdt">≈ $ --</span>
+                            <span class="price-wemix">≈ WEMIX --</span>
                         </div>
                     </div>
-                </div>
+                </a>
                 <?php endforeach; ?>
             </div>
+            <?php endif; ?>
+
+            <!-- Disponíveis para venda -->
+            <?php if (!empty($available_accounts)): ?>
+            <h3 class="text-2xl font-bold text-yellow-400 mb-6 scroll-animate">Contas à Venda</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+                <?php foreach (array_slice($available_accounts, 0, 6) as $account): ?>
+                <a href="/conta.php?id=<?php echo (int)$account['id']; ?>" class="relative group overflow-hidden rounded-xl shadow-lg scroll-animate account-card" data-price-brl="<?php echo htmlspecialchars((string)(float)$account['price']); ?>">
+                    <img src="<?php echo $account['image'] ?: 'https://via.placeholder.com/800x600/1f2937/6b7280?text=Sem+Imagem'; ?>" alt="<?php echo htmlspecialchars($account['title']); ?>" class="w-full h-64 object-cover transition duration-500 group-hover:scale-110">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
+                    <div class="absolute top-3 left-3"><span class="px-2 py-1 text-xs rounded-full bg-green-900 text-green-300">Disponível</span></div>
+                    <div class="absolute bottom-0 left-0 right-0 p-6">
+                        <h3 class="text-xl font-bold text-white"><?php echo htmlspecialchars($account['title']); ?></h3>
+                        <p class="text-yellow-400 font-semibold">PS: <?php echo htmlspecialchars($account['power_score']); ?></p>
+                        <div class="flex justify-between items-center mt-2">
+                            <span class="text-gray-300">Nível <?php echo htmlspecialchars($account['level']); ?></span>
+                            <span class="text-yellow-400 font-bold">R$ <?php echo number_format((float)$account['price'], 2, ',', '.'); ?></span>
+                        </div>
+                        <div class="mt-1 text-sm text-gray-300 flex gap-4">
+                            <span class="price-usdt">≈ $ --</span>
+                            <span class="price-wemix">≈ WEMIX --</span>
+                        </div>
+                    </div>
+                </a>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+
+            <!-- Vendidas -->
+            <?php if (!empty($sold_accounts)): ?>
+            <h3 class="text-2xl font-bold text-yellow-400 mb-6 scroll-animate">Contas Vendidas</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <?php foreach (array_slice($sold_accounts, 0, 6) as $account): ?>
+                <a href="/conta.php?id=<?php echo (int)$account['id']; ?>" class="relative group overflow-hidden rounded-xl shadow-lg scroll-animate opacity-70 account-card" data-price-brl="<?php echo htmlspecialchars((string)(float)$account['price']); ?>">
+                    <img src="<?php echo $account['image'] ?: 'https://via.placeholder.com/800x600/1f2937/6b7280?text=Sem+Imagem'; ?>" alt="<?php echo htmlspecialchars($account['title']); ?>" class="w-full h-64 object-cover transition duration-500 group-hover:scale-110">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
+                    <div class="absolute top-3 left-3"><span class="px-2 py-1 text-xs rounded-full bg-red-900 text-red-300">Vendida</span></div>
+                    <div class="absolute bottom-0 left-0 right-0 p-6">
+                        <h3 class="text-xl font-bold text-white"><?php echo htmlspecialchars($account['title']); ?></h3>
+                        <p class="text-yellow-400 font-semibold">PS: <?php echo htmlspecialchars($account['power_score']); ?></p>
+                        <div class="flex justify-between items-center mt-2">
+                            <span class="text-gray-300">Nível <?php echo htmlspecialchars($account['level']); ?></span>
+                            <span class="text-yellow-400 font-bold">R$ <?php echo number_format((float)$account['price'], 2, ',', '.'); ?></span>
+                        </div>
+                        <div class="mt-1 text-sm text-gray-300 flex gap-4">
+                            <span class="price-usdt">≈ $ --</span>
+                            <span class="price-wemix">≈ WEMIX --</span>
+                        </div>
+                    </div>
+                </a>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
             
             <div class="text-center mt-12 scroll-animate">
                 <button onclick="navigateTo('accounts')" class="bg-transparent hover:bg-yellow-500 text-yellow-400 font-bold py-3 px-6 border-2 border-yellow-400 rounded-lg transition duration-300 text-lg hover:text-gray-900 flex items-center justify-center mx-auto">
@@ -359,7 +468,7 @@ body {
                             </div>
                             <div>
                                 <h4 class="text-lg font-semibold text-white mb-1">Email</h4>
-                                <p class="text-gray-400"><?php echo $contact_info['email']; ?></p>
+                                <a class="text-gray-300 hover:text-yellow-400" href="mailto:<?php echo htmlspecialchars($contact_info['email']); ?>"><?php echo htmlspecialchars($contact_info['email']); ?></a>
                             </div>
                         </div>
                         <div class="flex items-start">
@@ -368,7 +477,8 @@ body {
                             </div>
                             <div>
                                 <h4 class="text-lg font-semibold text-white mb-1">WhatsApp</h4>
-                                <p class="text-gray-400"><?php echo $contact_info['phone']; ?></p>
+                                <?php $contact_phone_link = preg_replace('/\D+/', '', (string)($contact_info['phone'] ?? '')); ?>
+                                <a class="text-gray-300 hover:text-yellow-400" target="_blank" href="https://wa.me/<?php echo $contact_phone_link; ?>"><?php echo htmlspecialchars($contact_info['phone']); ?></a>
                             </div>
                         </div>
                         <div class="flex items-start">
@@ -377,25 +487,26 @@ body {
                             </div>
                             <div>
                                 <h4 class="text-lg font-semibold text-white mb-1">Discord</h4>
-                                <p class="text-gray-400"><?php echo $contact_info['discord']; ?></p>
+                                <?php $discord = (string)($contact_info['discord'] ?? ''); ?>
+                                <a class="text-gray-300 hover:text-yellow-400" target="_blank" href="<?php echo strpos($discord, 'http') === 0 ? htmlspecialchars($discord) : 'https://discordapp.com/users/' . htmlspecialchars($discord); ?>"><?php echo htmlspecialchars($discord); ?></a>
                             </div>
                         </div>
                     </div>
                 </div>
                 
                 <div class="scroll-animate">
-                    <form class="bg-gray-800 rounded-xl p-8 shadow-lg">
+                    <form class="bg-gray-800 rounded-xl p-8 shadow-lg" id="contactForm">
                         <div class="mb-6">
                             <label for="name" class="block text-gray-300 mb-2">Seu Nome</label>
-                            <input type="text" id="name" class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-white">
+                            <input type="text" id="name" required class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-white">
                         </div>
                         <div class="mb-6">
                             <label for="email" class="block text-gray-300 mb-2">Email</label>
-                            <input type="email" id="email" class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-white">
+                            <input type="email" id="email" required class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-white">
                         </div>
                         <div class="mb-6">
                             <label for="subject" class="block text-gray-300 mb-2">Assunto</label>
-                            <select id="subject" class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-white">
+                            <select id="subject" required class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-white">
                                 <option value="">Selecione...</option>
                                 <option value="buy">Comprar Conta</option>
                                 <option value="sell">Vender Conta</option>
@@ -405,11 +516,12 @@ body {
                         </div>
                         <div class="mb-6">
                             <label for="message" class="block text-gray-300 mb-2">Mensagem</label>
-                            <textarea id="message" rows="4" class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-white"></textarea>
+                            <textarea id="message" rows="4" required class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-white"></textarea>
                         </div>
                         <button type="submit" class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-6 rounded-lg transition duration-300 text-lg">
                             Enviar Mensagem
                         </button>
+                        <div id="contactSuccess" class="hidden text-green-400 text-center mt-4">Mensagem enviada! Entraremos em contato.</div>
                     </form>
                 </div>
             </div>
@@ -449,8 +561,8 @@ body {
                     <h4 class="text-lg font-semibold text-white mb-4">Redes Sociais</h4>
                     <div class="flex space-x-4">
                         <?php foreach ($social_media as $social): ?>
-                        <a href="<?php echo $social['url']; ?>" class="text-gray-400 hover:text-yellow-400 transition">
-                            <i data-feather="<?php echo $social['platform']; ?>" class="w-5 h-5"></i>
+                        <a href="<?php echo htmlspecialchars($social['url']); ?>" target="_blank" rel="noopener" class="text-gray-400 hover:text-yellow-400 transition">
+                            <i data-feather="<?php echo htmlspecialchars($social['platform']); ?>" class="w-5 h-5"></i>
                         </a>
                         <?php endforeach; ?>
                     </div>
@@ -670,11 +782,73 @@ body {
             });
         }
 
+        // Handle contact form (mailto fallback)
+        const contactForm = document.getElementById('contactForm');
+        if (contactForm) {
+            contactForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const name = document.getElementById('name').value.trim();
+                const email = document.getElementById('email').value.trim();
+                const subject = document.getElementById('subject').value;
+                const message = document.getElementById('message').value.trim();
+                const mailto = `mailto:<?php echo rawurlencode($contact_info['email'] ?? ''); ?>?subject=${encodeURIComponent('[Site] '+subject+' - '+name)}&body=${encodeURIComponent(message+'\n\nContato: '+email)}`;
+                window.location.href = mailto;
+                const success = document.getElementById('contactSuccess');
+                if (success) success.classList.remove('hidden');
+            });
+        }
+
+        // FX rates fetch to compute USDT and WEMIX approximations
+        async function updatePrices() {
+            try {
+                const brlToUsd = await fetch('https://api.exchangerate.host/latest?base=BRL&symbols=USD').then(r => r.json());
+                const brlUsd = brlToUsd?.rates?.USD || null;
+                // Example WEMIX price in USD (replace with a reliable API as needed)
+                const wemixUsd = await fetch('https://min-api.cryptocompare.com/data/price?fsym=WEMIX&tsyms=USD').then(r => r.json()).then(j => j.USD || null).catch(() => null);
+                document.querySelectorAll('.account-card').forEach(card => {
+                    const brl = parseFloat(card.dataset.priceBrl || '0');
+                    const usdEl = card.querySelector('.price-usdt');
+                    const wemixEl = card.querySelector('.price-wemix');
+                    if (brlUsd && usdEl) {
+                        const usd = brl * brlUsd;
+                        usdEl.textContent = `≈ $ ${usd.toFixed(2)}`;
+                    }
+                    if (brlUsd && wemixUsd && wemixEl) {
+                        const usd = brl * brlUsd;
+                        const wemix = usd / wemixUsd;
+                        wemixEl.textContent = `≈ WEMIX ${wemix.toFixed(2)}`;
+                    }
+                });
+            } catch (_) {}
+        }
+
+        // Theme toggle and persistence
+        const appRoot = document.getElementById('appRoot');
+        const themeToggle = document.getElementById('themeToggle');
+        function applyTheme(theme) {
+            if (theme === 'light') {
+                appRoot.classList.add('light');
+            } else {
+                appRoot.classList.remove('light');
+            }
+            localStorage.setItem('theme', theme);
+            feather.replace();
+        }
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        applyTheme(savedTheme);
+        if (themeToggle) {
+            themeToggle.addEventListener('click', () => {
+                const next = appRoot.classList.contains('light') ? 'dark' : 'light';
+                applyTheme(next);
+            });
+        }
+
         // Initialize on load
         document.addEventListener('DOMContentLoaded', () => {
             handleScrollAnimation();
             feather.replace();
             createWaveDivider();
+            updatePrices();
         });
 </script>
 </body>
